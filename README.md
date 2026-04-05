@@ -1,159 +1,143 @@
-# Multi-Omic Analysis of Ohnolog Regulatory Divergence in Allotetraploid *Cyprinus carpio*
+# Genome-Wide ATAC-seq Accessibility Analysis of Ohnolog Pairs in *Cyprinus carpio*
 
 ## Overview
 
-This repository contains the analysis code, processed data, and figures from an MSc Bioinformatics thesis project (University of Birmingham, 2024–2025) investigating how duplicated gene pairs (ohnologs) diverge in their regulatory control following whole-genome duplication (WGD) in common carp (*Cyprinus carpio*).
+This repository contains the code and supplementary data for a genome-wide quantitative analysis of chromatin accessibility asymmetry between ohnolog pairs in the allotetraploid common carp (*Cyprinus carpio*), extending prior work from an MSc project examining regulatory divergence during late zygotic development.
 
-Common carp is an allotetraploid species whose genome arose from the merger of two ancestral diploid genomes approximately 12.4 million years ago. This created thousands of ohnolog pairs — duplicate genes derived from the same ancestral gene, one on each subgenome (A and B). A central question in polyploid genome evolution is whether these duplicates maintain equivalent expression and regulation, or whether one copy becomes dominant while the other degrades or specialises. This project addresses that question by integrating three independent data types across two developmental stages.
+The original MSc analysis ([Gibson, 2024](https://github.com/rossjamesgibson21-bit/MSc-Project-Multi-Omic-Analysis-Allotetraploid-Cyprinid)) characterised promoter-proximal epigenetic asymmetry across a curated set of 75 ohnolog pairs using semi-quantitative visual scoring of ATAC-seq and histone modification tracks. That analysis identified significant activation-mark asymmetry in SubgB-dominant pairs but non-significant ATAC accessibility differences across all bias categories — a finding that may reflect the limited power of the curated subset and the semi-quantitative methodology rather than a genuine absence of accessibility divergence.
+
+This project addresses that limitation directly by applying a fully quantitative, automated pipeline to the complete set of 7,497 expressed ohnolog pairs (baseMean ≥ 150), using ATAC-seq narrow peak data and programmatic bedtools intersection to characterise accessibility asymmetry at scale.
+
+---
 
 ## Biological Question
 
-After whole-genome duplication, do ohnolog pairs show symmetric or asymmetric regulatory divergence? Specifically:
+> To what extent does promoter-proximal chromatin accessibility asymmetry between ohnolog copies correlate with expression bias at the genome-wide scale in *C. carpio* Late Somite stage embryos?
 
-- Do ohnolog copies on subgenomes A and B show balanced or biased expression during embryonic development?
-- Is expression bias correlated with differences in chromatin accessibility (ATAC-seq) and histone modification (ChIP-seq) at promoter regions?
-- Are functionally coherent gene categories (e.g. ribosome biogenesis, signalling, transcriptional regulation) enriched among ohnologs with particular divergence trajectories?
+The curated 75-pair analysis suggested that ATAC accessibility differences between subgenomes were non-significant, while histone modification asymmetry (H3K27ac, H3K4me3) tracked expression bias robustly in SubgB-dominant pairs. Scaling the ATAC analysis to the full ohnolog complement allows us to test whether:
 
-## Data Types
+1. ATAC asymmetry is genuinely absent as a correlate of expression bias, or whether it emerges at genome-wide scale with sufficient statistical power
+2. The direction of accessibility asymmetry is consistent with the subgenome dominance patterns identified in the histone mark analysis
+3. Accessibility asymmetry varies across expression bias magnitude categories (Moderate, Strong, Extreme)
 
-The analysis integrates three omic layers from curated ohnolog pairs across **Late Somite** and **Pre-Hatch** developmental stages:
+---
 
-| Data Type | What It Measures | Application in This Project |
-|-----------|-----------------|---------------------------|
-| **RNA-seq** | mRNA expression levels | Quantifying expression bias between ohnolog A and B copies |
-| **ATAC-seq** | Chromatin accessibility | Comparing promoter-level openness between ohnolog pairs |
-| **Histone ChIP-seq** | Histone modification marks | Assessing epigenetic state at ohnolog regulatory regions |
+## Data
 
-## Analytical Approach
+### Input Files
 
-1. **Expression bias classification**: Ohnolog pairs were classified into divergence categories based on the magnitude and direction of expression bias between subgenome A and B copies, using DESeq2-derived log2 fold-changes and Wilcoxon signed-rank tests. Categories range from *Balanced* (no significant bias) through *Moderate* to *Extreme* subgenome dominance.
+| File | Description | Source |
+|------|-------------|--------|
+| `DegListWithExNum_NEW.tsv` | DESeq2 expression data for 9,581 ohnolog pairs across Late Somite and Pre-Hatch stages, including Ensembl gene IDs, scaffold coordinates, exon counts, L2FC and padj values | Provided by collaborating wet lab (A. Jimenez-Gonzalez) |
+| `LateSomATAC.narrowPeak` | ATAC-seq narrow peak calls for Late Somite stage, aligned to cypCar4 (WAG4.0) assembly | Provided by collaborating wet lab |
 
-2. **Chromatin accessibility comparison**: ATAC-seq signal at promoter regions of ohnolog pairs was quantified and compared between A and B copies to assess whether expression bias is reflected in differential chromatin openness.
+> **Note**: Raw data files are not included in this repository as they derive from unpublished work by the collaborating researcher. The pipeline is fully reproducible given these input files.
 
-3. **Histone mark integration**: ChIP-seq data for activating and repressive histone marks were integrated to determine whether divergent ohnologs show corresponding epigenetic asymmetry.
+### Genome Assembly
 
-4. **Functional enrichment and network analysis**: Gene Ontology enrichment and protein–protein interaction (PPI) network analysis (via STRING/zebrafish ortholog mapping) were performed for each divergence class to identify functional themes among biased ohnologs.
+All coordinates use the *Cyprinus carpio carpio* WAG4.0 assembly (UCSC: cypCar4; NCBI: GCA_905221575.1), with scaffold identifiers in CAJNDQ format. Gene coordinates are retrieved programmatically from the Ensembl REST API using ENSCCRG Ensembl gene IDs.
 
-## Repository Structure
+---
+
+## Pipeline
+
+### Dependencies
 
 ```
-├── README.md
-├── notebooks/
-│   ├── 01_DE_Analysis.ipynb              # Differential expression and bias classification
-│   ├── 02_Ohnolog_Regulatory_Analysis.ipynb  # ATAC-seq and ChIP-seq integration
-│   └── 03_Enrichment_and_Networks.ipynb  # GO enrichment and PPI network analysis
-├── data/
-│   ├── ohnolog_pairs/
-│   │   ├── filtered_ohnologs_basemean_150.csv
-│   │   └── filtered_ohnologs_Lsom_L2FC_2_to_7.csv
-│   ├── divergence_classes/
-│   │   ├── Balanced_LSom.csv
-│   │   ├── Balanced_PHatch.csv
-│   │   ├── Moderate_SubgA_Dom_LSom.csv
-│   │   ├── Moderate_SubgA_Dom_PHatch.csv
-│   │   ├── Moderate_SubgB_Dom_LSom.csv
-│   │   ├── Moderate_SubgB_Dom_PHatch.csv
-│   │   ├── Strong_SubgA_Dom_LSom.csv
-│   │   ├── Strong_SubgA_Dom_PHatch.csv
-│   │   ├── Strong_SubgB_Dom_LSom.csv
-│   │   ├── Strong_SubgB_Dom_PHatch.csv
-│   │   ├── Extreme_SubgA_Dom_LSom.csv
-│   │   ├── Extreme_SubgA_Dom_PHatch.csv
-│   │   ├── Extreme_SubgB_Dom_LSom.csv
-│   │   ├── Extreme_SubgB_Dom_PHatch.csv
-│   │   ├── No_Significant_Bias_LSom.csv
-│   │   └── No_Significant_Bias_PHatch.csv
-│   ├── zebrafish_mappings/
-│   │   └── Zebrafish_mapping.tsv
-│   ├── intersection_results/
-│   │   ├── Extreme_SubgA_Dom_LSom_intersections.csv
-│   │   ├── Extreme_SubgA_Dom_PHatch_intersections.csv
-│   │   ├── Extreme_SubgB_Dom_LSom_intersections.csv
-│   │   └── Extreme_SubgB_Dom_PHatch_intersections.csv
-│   └── summary/
-│       ├── Combined_wilcoxon_summary.csv
-│       ├── DEGList_EXNum_Compile_PEAK.xlsx
-│       ├── DEGList_EXNum_MEAN_PHatch.tsv
-│       └── DegListWithExNum.xlsx
-├── figures/
-│   ├── igv_tracks/
-│   │   ├── dnmt1_chr2_20kb.png
-│   │   ├── dnmt1_chr4_yscale.png
-│   │   ├── mib2_chr18_5kb.png
-│   │   ├── mib2_chr24_20kb.png
-│   │   ├── tgfb2_chr3_20kb.png
-│   │   └── tgfb2_chr48_20kb.png
-│   ├── ppi_networks/
-│   │   ├── Extreme-SubgA_Dom_LSom_PPI_Main_Network.png
-│   │   ├── Extreme-SubgA_Dom_PHatch_Main_PPI_Network.png
-│   │   ├── Extreme-SubgB_Dom_LSom_Main_PPI_Network.png
-│   │   └── Extreme-SubgB_Dom_PreHatch_Main_PPI_Network.png
-│   ├── enrichment/
-│   │   └── Enriched_Pathways.png
-│   ├── expression/
-│   │   ├── Correlation_Matrix_Task2_RE_and_Ohnolog_Analysis.png
-│   │   └── Comparison_of_TF_Families.png
-│   └── ribosome_biogenesis/
-│       ├── Balanced_LSom_Ribosome_Biogenesis_Network.png
-│       ├── SubgA_Dom_LSom_Ribosome_Biogenesis_Network.png
-│       └── SubgB_Dom_LSom_Ribosome_Biogenesis_Network.png
-└── results/
-    └── zebrafish_id_lists/
-        ├── Balanced_LSom_zebrafish_IDs.txt
-        ├── Balanced_PHatch_zebrafish_IDs.txt
-        ├── Extreme_SubgA_Dom_LSom_zebrafish_IDs.txt
-        ├── Extreme_SubgA_Dom_PHatch_zebrafish_IDs.txt
-        ├── Extreme_SubgB_Dom_LSom_zebrafish_IDs.txt
-        ├── Extreme_SubgB_Dom_PHatch_zebrafish_IDs.txt
-        ├── Moderate_SubgA_Dom_LSom_zebrafish_IDs.txt
-        ├── Moderate_SubgA_Dom_PHatch_zebrafish_IDs.txt
-        ├── Moderate_SubgB_Dom_LSom_zebrafish_IDs.txt
-        ├── Moderate_SubgB_Dom_PHatch_zebrafish_IDs.txt
-        ├── No_Significant_Bias_LSom_zebrafish_IDs.txt
-        ├── No_Significant_Bias_PHatch_zebrafish_IDs.txt
-        ├── Strong_SubgA_Dom_LSom_zebrafish_IDs.txt
-        ├── Strong_SubgA_Dom_PHatch_zebrafish_IDs.txt
-        ├── Strong_SubgB_Dom_LSom_zebrafish_IDs.txt
-        └── Strong_SubgB_Dom_PHatch_zebrafish_IDs.txt
+python >= 3.9
+pandas >= 2.1.4
+pybedtools >= 0.10.0
+scipy
+numpy
+requests
+bedtools >= 2.31.1
+openpyxl
 ```
 
-## Key Findings
+Install Python dependencies:
 
-- Ohnolog pairs show a spectrum of expression divergence, from fully balanced to extreme subgenome dominance, with the distribution shifting between Late Somite and Pre-Hatch stages.
-- Extreme subgenome-B-dominant ohnologs at Late Somite stage are enriched for ribosome biogenesis and translational machinery, suggesting subgenome-specific control of core biosynthetic processes during early development.
-- PPI network analysis of divergence classes reveals functionally coherent modules, with distinct biological processes enriched in A-dominant versus B-dominant ohnolog sets.
-- IGV visualisation of candidate ohnologs (*dnmt1*, *mib2*, *tgfb2*) across homeologous chromosomes shows differential ATAC-seq peak profiles consistent with the expression bias observed in the RNA-seq data.
+```bash
+pip install pandas pybedtools scipy numpy requests openpyxl
+```
 
-## Tools and Dependencies
+Bedtools must be installed separately and available on your PATH:
 
-**Languages**: Python 3, R
+```bash
+bedtools --version
+```
 
-**Key Python libraries**: pandas, NumPy, SciPy, matplotlib, seaborn, Jupyter
+### Running the Pipeline
 
-**Key R packages**: DESeq2, GenomicRanges, clusterProfiler, ggplot2
+1. Clone this repository
+2. Place input data files in the expected locations (or update paths in the script header)
+3. Run the pipeline:
 
-**Bioinformatics tools**: STAR (alignment), MACS2 (ATAC-seq peak calling), deepTools (signal visualisation), samtools, bedtools, featureCounts
+```bash
+python3 atac_pipeline.py
+```
 
-**External resources**: STRING database (PPI networks via zebrafish orthologs), Gene Ontology, IGV (genome browser)
+On first run, the script queries the Ensembl REST API for TSS coordinates for all ENSCCRG IDs. Results are cached locally in `atac_analysis/ensembl_coords_cache.json` — subsequent runs use the cache and are substantially faster.
 
-## Reference Genome
+### Pipeline Steps
 
-All analyses use the *Cyprinus carpio* chromosome-level genome assembly with subgenome A and B assignments as described in Xu et al. (2019).
+```
+1. Load DEG list → filter to baseMean ≥ 150 (7,497 pairs)
+2. Query Ensembl REST API → TSS coordinates for all ENSCCRG IDs (batched, cached)
+3. Build promoter window BED files → ±2kb around TSS for each subgenome copy
+4. Intersect with ATAC narrowPeak → pybedtools left-outer join
+5. Quantify accessibility → max fold enrichment per promoter window
+6. Calculate ATAC asymmetry → log2(SubgA / SubgB fold enrichment + pseudocount)
+7. Correlate asymmetry with L2FC → Spearman correlation, Mann-Whitney U by bias category
+```
 
-## Zebrafish Ortholog Mapping
+---
 
-Because functional annotation and PPI databases are more complete for zebrafish (*Danio rerio*) than for carp, ohnolog gene IDs were mapped to zebrafish orthologs for GO enrichment and STRING network analysis. The mapping file (`data/zebrafish_mappings/Zebrafish_mapping.tsv`) contains these correspondences.
+## Outputs
 
-## Status
+All outputs are written to `~/Desktop/atac_analysis/` by default (configurable in script header).
 
-This project formed the basis of an MSc thesis completed in October 2025. Manuscript preparation is in progress, with a planned extension to genome-wide ATAC-seq analysis beyond the initial curated ohnolog set.
+| File | Description |
+|------|-------------|
+| `ohnolog_atac_asymmetry_results.csv` | Per-pair results: ATAC fold enrichment per subgenome, asymmetry score, L2FC, bias category |
+| `atac_asymmetry_summary_by_bias.csv` | Mean and median ATAC asymmetry by expression bias category |
+| `promoters_SubgA.bed` | Promoter window BED file for SubgA copies |
+| `promoters_SubgB.bed` | Promoter window BED file for SubgB copies |
+| `ensembl_coords_cache.json` | Cached Ensembl REST API coordinate results |
+
+---
+
+## Key Analytical Choices
+
+**Promoter window**: ±2kb around TSS. This is wider than the ±5kb PADRE-anchored window used in the original MSc analysis, but without PADRE coordinates available for all 7,497 pairs, TSS-centred windows provide a consistent and reproducible promoter definition. Sensitivity analyses with ±1kb and ±5kb windows are straightforward to implement by modifying `PROMOTER_WINDOW` in the script.
+
+**Quantification**: Maximum fold enrichment within the promoter window, where multiple peaks overlap. This captures the strongest accessibility signal rather than cumulative peak density, which is more interpretable in a promoter context.
+
+**Asymmetry metric**: log2(SubgA fold enrichment + ε) / (SubgB fold enrichment + ε), where ε = 0.1 is a pseudocount to handle zero values. Positive values indicate greater SubgA accessibility; negative values indicate greater SubgB accessibility. This is directly comparable to the L2FC metric (log2(SubgA / SubgB expression)).
+
+**Limitations**: TSS coordinates are derived from Ensembl annotations which may not perfectly match the cypCar4 assembly used for ATAC alignment. Coordinate discrepancies between assemblies could introduce noise in the intersection step. Additionally, without the original PADRE BED file, promoter-proximal regulatory elements cannot be anchored to ATAC summits as in the original analysis.
+
+---
+
+## Relationship to Prior Work
+
+This analysis directly extends:
+
+> Gibson, R.J. (2024). *Multi-omic Analysis of an Allotetraploid Cyprinid Reveals Regulatory Divergence of Ohnologs During Late Zygotic Development*. MSc dissertation, University of Birmingham.
+> Repository: [MSc-Project-Multi-Omic-Analysis-Allotetraploid-Cyprinid](https://github.com/rossjamesgibson21-bit/MSc-Project-Multi-Omic-Analysis-Allotetraploid-Cyprinid)
+
+The findings from this extended analysis are intended to complement ongoing wet lab work by A. Jimenez-Gonzalez (University of Birmingham) and may contribute to a collaborative publication.
+
+---
 
 ## Author
 
-**Ross Gibson** — MSc Bioinformatics, University of Birmingham
-- Email: rossjamesgibson21@gmail.com
-- Location: Edinburgh, UK
+Ross Gibson  
+MSc Bioinformatics, University of Birmingham  
+GTCS Registered Biology Teacher  
+Edinburgh, Scotland  
 
-## Licence
+---
 
-This repository is shared for academic and portfolio purposes. Please contact the author before reusing data or code in publications.
+## License
+
+Code is released under the MIT License. Data files are not included; please contact the author regarding data access.
